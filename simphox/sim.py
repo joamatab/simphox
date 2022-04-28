@@ -391,7 +391,7 @@ class SimGrid(FDGrid):
     def viz_panel(self, img_width: float = 700) -> Tuple["pn.layout.Panel", Tuple["Pipe", "Pipe", "Pipe"]]:
         if not HOLOVIEWS_IMPORTED:
             raise ImportError("Holoviews not imported, so a viz panel cannot be generated")
-        if not self.ndim == 2:
+        if self.ndim != 2:
             raise NotImplementedError("Only implemented for ndim == 2!")
         extent = get_extent_2d(self.shape, self.spacing[0])
         aspect = (extent[1] - extent[0]) / (extent[3] - extent[2])
@@ -431,7 +431,7 @@ class SimGrid(FDGrid):
         """
         # TODO(sunil): change to using port_profiles if possible
         # get slab index
-        if not self.ndim == 3:
+        if self.ndim != 3:
             raise RuntimeError("Require ndim = 3 for 2d variational effective index method.")
         if not wavelength:
             raise ValueError("Must specify a projection wavelength for the effective index method.")
@@ -448,8 +448,18 @@ class SimGrid(FDGrid):
                 slab_x, slab_y = ((int((slab_x - port.w) / self.spacing[0]),
                                    int((slab_x + port.w) / self.spacing[0])), int(slab_y / self.spacing[1]))
 
-        x_cen = slab_x if not isinstance(slab_x, tuple) else int((slab_x[0] + slab_x[1]) / 2)
-        y_cen = slab_y if not isinstance(slab_y, tuple) else int((slab_y[0] + slab_y[1]) / 2)
+        x_cen = (
+            int((slab_x[0] + slab_x[1]) / 2)
+            if isinstance(slab_x, tuple)
+            else slab_x
+        )
+
+        y_cen = (
+            int((slab_y[0] + slab_y[1]) / 2)
+            if isinstance(slab_y, tuple)
+            else slab_y
+        )
+
         slab_mode_eps = self.eps[x_cen, y_cen]
         beta, slab_mode = ModeSolver(
             shape=slab_mode_eps.shape,

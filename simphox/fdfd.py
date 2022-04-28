@@ -121,8 +121,7 @@ class FDFD(SimGrid):
         Returns:
             Electric field operator :math:`A` for solving Maxwell's equations at frequency :math:`omega`.
         """
-        mat = self.curl_curl - self.k0 ** 2 * sp.diags(self.eps_t.flatten())
-        return mat
+        return self.curl_curl - self.k0 ** 2 * sp.diags(self.eps_t.flatten())
 
     A = mat  # alias A (common symbol for FDFD matrix) to mat
 
@@ -136,8 +135,7 @@ class FDFD(SimGrid):
         df, db = self.df, self.db
         ddz = -db[0] @ df[0] - db[1] @ df[1]
         ddz.sort_indices()  # for the solver
-        mat = ddz - self.k0 ** 2 * sp.diags(self.eps_t[2].flatten())
-        return mat
+        return ddz - self.k0 ** 2 * sp.diags(self.eps_t[2].flatten())
 
     @property
     def mat_hz(self) -> sp.spmatrix:
@@ -148,8 +146,11 @@ class FDFD(SimGrid):
         """
         df, db = self.df, self.db
         t0, t1 = sp.diags(1 / self.eps_t[0].flatten()), sp.diags(1 / self.eps_t[1].flatten())
-        mat = -db[0] @ t0 @ df[0] - db[1] @ t1 @ df[1] - self.k0 ** 2 * sp.identity(self.n)
-        return mat
+        return (
+            -db[0] @ t0 @ df[0]
+            - db[1] @ t1 @ df[1]
+            - self.k0**2 * sp.identity(self.n)
+        )
 
     def e2h(self, e: np.ndarray, beta: Optional[float] = None) -> np.ndarray:
         """
@@ -426,5 +427,4 @@ class FDFD(SimGrid):
                          np.exp(1j * self.pos[1][:-1] * k[1]),
                          np.exp(1j * self.pos[2][:-1] * k[2])).flatten()
         a = self.mat
-        src = self.reshape((q @ a - a @ q) @ fsrc)  # qaaq = quack :)
-        return src
+        return self.reshape((q @ a - a @ q) @ fsrc)

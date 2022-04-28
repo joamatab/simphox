@@ -78,7 +78,7 @@ PARDISO_FULLSOLVE = 13
 class Pardiso:
     def __init__(self, mtype: int = 13):
         self.mtype = mtype
-        if mtype in (1, 3):
+        if mtype in {1, 3}:
             raise NotImplementedError(f"mtype = {mtype} - structurally symmetric not supported")
         if self.is_complex:
             self.dtype = np.complex128
@@ -228,12 +228,12 @@ class Feast:
     def feast(self, mat: sp.csr_matrix, m0: int, erange: Tuple[float, float], symmetric: bool = True):
         dtype = mat.dtype
         ctypes_dtype = np.ctypeslib.ndpointer(dtype)
-        single_precision = dtype == np.complex64 or dtype == np.float32
+        single_precision = dtype in [np.complex64, np.float32]
         rdtype = np.float32 if single_precision else np.float64
         ctypes_rdtype = np.ctypeslib.ndpointer(rdtype)
-        if dtype == np.complex128 or dtype == np.complex64:
+        if dtype in [np.complex128, np.complex64]:
             feast_fn = cfeast_hcsrev if single_precision else zfeast_hcsrev
-        elif dtype == np.float64 or dtype == np.float32:
+        elif dtype in [np.float64, np.float32]:
             feast_fn = sfeast_scsrev if single_precision else dfeast_scsrev
         else:
             raise TypeError(f'Expected mat.dtype to be one of (np.complex128, np.complex64, np.float64, np.float32),'

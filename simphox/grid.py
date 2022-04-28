@@ -20,17 +20,25 @@ class Grid:
             eps: Relative permittivity
         """
         self.shape = np.asarray(shape, dtype=np.int)
-        self.spacing = spacing * np.ones(len(shape)) if isinstance(spacing, int) or isinstance(spacing, float) else np.asarray(spacing)
+        self.spacing = (
+            spacing * np.ones(len(shape))
+            if isinstance(spacing, (int, float))
+            else np.asarray(spacing)
+        )
+
         self.ndim = len(shape)
         self.shape3 = np.hstack((self.shape, np.ones((3 - self.ndim,), dtype=self.shape.dtype)))
         self.spacing3 = np.hstack((self.spacing, np.ones((3 - self.ndim,), dtype=self.spacing.dtype) * np.inf))
 
-        if not self.ndim == self.spacing.size:
+        if self.ndim != self.spacing.size:
             raise AttributeError(f'Require shape.size == spacing.size but got '
                                  f'{self.shape.size} != {self.spacing.size}')
         self.n = np.prod(self.shape)
-        self.eps: np.ndarray = np.ones(self.shape) * eps if not isinstance(eps, np.ndarray) else eps
-        if not tuple(self.shape) == self.eps.shape:
+        self.eps: np.ndarray = (
+            eps if isinstance(eps, np.ndarray) else np.ones(self.shape) * eps
+        )
+
+        if tuple(self.shape) != self.eps.shape:
             raise AttributeError(f'Require grid_shape == eps.shape but got '
                                  f'{self.shape} != {self.eps.shape}')
         self.size = self.spacing * self.shape
@@ -87,7 +95,7 @@ class Grid:
         else:
             zidx = (int(zmin / self.spacing[0]), int((zmin + thickness) / self.spacing[1]))
             self.eps[mask == 1, zidx[0]:zidx[1]] = eps
-        self.port = {port_name: port for port_name, port in component.port.items()}
+        self.port = dict(component.port.items())
         self.port_thickness = 0 if thickness is None else thickness
         self.port_height = 0 if thickness is None else zmin + thickness / 2
         return self
@@ -118,9 +126,9 @@ class Grid:
         """
         if self.ndim == 1:
             raise ValueError(f"Simulation dimension ndim must be 2 or 3 but got {self.ndim}.")
-        if not len(size) == 3:
+        if len(size) != 3:
             raise ValueError(f"For simulation that is 3d, must provide size arraylike of size 3 but got {size}")
-        if not len(center) == 3:
+        if len(center) != 3:
             raise ValueError(f"For simulation that is 3d, must provide center arraylike of size 3 but got {center}")
 
         c = (np.asarray(center) / self.spacing3).astype(np.int)  # assume isotropic for now...
@@ -206,15 +214,20 @@ class FDGrid(Grid):
         self.yee_avg = yee_avg
         self.name = name
         self.field_shape = np.hstack((3, self.shape))
-        if self.pml_shape is not None:
-            if np.any(self.pml_shape <= 3) or np.any(self.pml_shape >= self.shape // 2):
-                raise AttributeError(f'PML shape must be more than 3 and less than half the shape on each axis.')
-        if pml is not None and not len(self.pml_shape) == len(self.shape):
+        if self.pml_shape is not None and (
+            np.any(self.pml_shape <= 3)
+            or np.any(self.pml_shape >= self.shape // 2)
+        ):
+            raise AttributeError(
+                'PML shape must be more than 3 and less than half the shape on each axis.'
+            )
+
+        if pml is not None and len(self.pml_shape) != len(self.shape):
             raise AttributeError(f'Need len(pml_shape) == len(grid_shape),'
                                  f'got ({len(pml)}, {len(self.shape)}).')
         self.bloch = np.ones_like(self.shape) * np.exp(1j * np.asarray(bloch_phase)) if isinstance(bloch_phase, float) \
             else np.exp(1j * np.asarray(bloch_phase))
-        if not len(self.bloch) == len(self.shape):
+        if len(self.bloch) != len(self.shape):
             raise AttributeError(f'Need len(bloch_phase) == len(grid_shape),'
                                  f'got ({len(self.bloch)}, {len(self.shape)}).')
         self.dtype = np.float64 if pml is None and bloch_phase == 0 else np.complex128

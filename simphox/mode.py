@@ -103,20 +103,19 @@ class ModeSolver(FDGrid):
             Magnetic field operator :math:`C`.
         """
 
-        if not self.ndim <= 2:
+        if self.ndim > 2:
             raise AttributeError("Grid dimension must be 1 or 2")
 
         df, db = self.df, self.db
 
-        if self.ndim == 2:
-            eps = [e.flatten() for e in self.eps_t]
-            eps_10 = sp.diags(np.hstack((eps[1], eps[0])))
-            m1 = eps_10 * self.k0 ** 2
-            m2 = eps_10 @ sp.vstack([-df[1], df[0]]) @ sp.diags(1 / eps[2]) @ sp.hstack([-db[1], db[0]])
-            m3 = sp.vstack(db[:2]) @ sp.hstack(df[:2])
-            return m1 + m2 + m3
-        else:
+        if self.ndim != 2:
             return sp.diags(self.eps.flatten()) * self.k0 ** 2 + df[0].dot(db[0])
+        eps = [e.flatten() for e in self.eps_t]
+        eps_10 = sp.diags(np.hstack((eps[1], eps[0])))
+        m1 = eps_10 * self.k0 ** 2
+        m2 = eps_10 @ sp.vstack([-df[1], df[0]]) @ sp.diags(1 / eps[2]) @ sp.hstack([-db[1], db[0]])
+        m3 = sp.vstack(db[:2]) @ sp.hstack(df[:2])
+        return m1 + m2 + m3
 
     C = wgm  # C is the matrix for the guided mode eigensolver
 
@@ -284,15 +283,22 @@ class ModeLibrary:
         """
         if self.ndim == 2:
             return self.solver.h2e(self.h(mode_idx), self.betas[mode_idx])
-        else:
-            mode = self.modes[mode_idx]
-            if tm_2d:
-                mode = np.hstack((1j * self.betas[mode_idx] * mode, self.o,
-                                  -(np.roll(mode, -1, axis=0) - mode) / self.solver.cell_sizes[0])) / (
-                        1j * self.solver.k0 * self.solver.eps_t.flatten())
-            else:
-                mode = np.hstack((self.o, mode, self.o))
-            return self.solver.reshape(mode)
+        mode = self.modes[mode_idx]
+        mode = (
+            np.hstack(
+                (
+                    1j * self.betas[mode_idx] * mode,
+                    self.o,
+                    -(np.roll(mode, -1, axis=0) - mode)
+                    / self.solver.cell_sizes[0],
+                )
+            )
+            / (1j * self.solver.k0 * self.solver.eps_t.flatten())
+            if tm_2d
+            else np.hstack((self.o, mode, self.o))
+        )
+
+        return self.solver.reshape(mode)
 
     @lru_cache()
     def sz(self, mode_idx: int = 0) -> np.ndarray:
@@ -335,9 +341,7 @@ class ModeLibrary:
         Returns:
            :math:`\mathbf{H}`, an :code:`ndarray` of shape :code:`(M, 3, X, Y)`
         """
-        hs = []
-        for mode in self.modes:
-            hs.append(self.solver.reshape(mode))
+        hs = [self.solver.reshape(mode) for mode in self.modes]
         return np.stack(hs).squeeze()
 
     @property
@@ -348,9 +352,11 @@ class ModeLibrary:
         Returns:
            :math:`\mathbf{E}`, an :code:`ndarray` of shape :code:`(M, 3, X, Y)`
         """
-        es = []
-        for beta, h in zip(self.betas, self.hs):
-            es.append(self.solver.h2e(h[..., np.newaxis], beta))
+        es = [
+            self.solver.h2e(h[..., np.newaxis], beta)
+            for beta, h in zip(self.betas, self.hs)
+        ]
+
         return np.stack(es).squeeze()
 
     @property
@@ -361,9 +367,11 @@ class ModeLibrary:
         Returns:
            :math:`\mathbf{S}_z`, an :code:`ndarray` of shape :code:`(M, X, Y)`
         """
-        szs = []
-        for e, h in zip(self.es, self.hs):
-            szs.append(poynting_fn(2)(e[..., np.newaxis], h[..., np.newaxis]))
+        szs = [
+            poynting_fn(2)(e[..., np.newaxis], h[..., np.newaxis])
+            for e, h in zip(self.es, self.hs)
+        ]
+
         return np.stack(szs).squeeze()
 
     @property
@@ -402,7 +410,15 @@ class ModeLibrary:
             ax.set_title(rf'{title}, $n_{idx + 1} = {self.n(idx):.4f}$', fontsize=title_size)
         else:
             ax.set_title(rf'{title}', fontsize=title_size)
-        ax.text(x=0.9, y=0.9, s=rf'$s_z$', color='white', transform=ax.transAxes, fontsize=label_size)
+        ax.text(
+            x=0.9,
+            y=0.9,
+            s='$s_z$',
+            color='white',
+            transform=ax.transAxes,
+            fontsize=label_size,
+        )
+
         ratio = np.max((self.te_ratios[idx], 1 - self.te_ratios[idx]))
         polarization = "TE" if np.argmax((self.te_ratios[idx], 1 - self.te_ratios[idx])) > 0 else "TM"
         ax.text(x=0.05, y=0.9, s=rf'{polarization}[{ratio:.2f}]', color='white', transform=ax.transAxes)
@@ -424,15 +440,22 @@ class ModeLibrary:
         field = self.es if use_e else self.hs
         if idx > self.m - 1:
             ValueError("Out of range of number of solutions")
-        if not (axis in (0, 1, 2)):
+        if axis not in {0, 1, 2}:
             ValueError(f"Axis expected to be (0, 1, 2) but got {axis}.")
         plot_field_2d(ax, field[idx][axis].real, self.eps, spacing=self.solver.spacing[0])
         if include_n:
             ax.set_title(rf'{title}, $n_{idx + 1} = {self.n(idx):.4f}$', fontsize=title_size)
         else:
             ax.set_title(rf'{title}', fontsize=title_size)
-        ax.text(x=0.9, y=0.9, s=rf'$e_y$' if use_e else rf'$h_y$', color='black', transform=ax.transAxes,
-                fontsize=label_size)
+        ax.text(
+            x=0.9,
+            y=0.9,
+            s='$e_y$' if use_e else '$h_y$',
+            color='black',
+            transform=ax.transAxes,
+            fontsize=label_size,
+        )
+
         ratio = np.max((self.te_ratios[idx], 1 - self.te_ratios[idx]))
         polarization = "TE" if np.argmax((self.te_ratios[idx], 1 - self.te_ratios[idx])) > 0 else "TM"
         ax.text(x=0.05, y=0.9, s=rf'{polarization}[{ratio:.2f}]', color='black', transform=ax.transAxes)
@@ -680,8 +703,5 @@ class ModeDevice:
             A list of :math:`L` :code:`Modes` solution objects
 
         """
-        solutions = []
         pbar = range if pbar is None else pbar
-        for wavelength in pbar(wavelengths):
-            solutions.append(self.solve(eps, m, wavelength))
-        return solutions
+        return [self.solve(eps, m, wavelength) for wavelength in pbar(wavelengths)]

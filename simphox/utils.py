@@ -88,33 +88,45 @@ class Box:
 
     def halign(self, c: Union["Box", float], left: bool = True, opposite: bool = False):
         x = self.min[0] if left else self.max[0]
-        p = c if isinstance(c, float) or isinstance(c, int) \
-            else (c.min[0] if left and not opposite or opposite and not left else c.max[0])
+        p = (
+            c
+            if isinstance(c, (float, int))
+            else c.min[0]
+            if left and not opposite or opposite and not left
+            else c.max[0]
+        )
+
         self.translate(dx=p - x)
         return self
 
     def valign(self, c: Union["Box", float], bottom: bool = True, opposite: bool = False):
         y = self.min[1] if bottom else self.max[1]
-        p = c if isinstance(c, float) or isinstance(c, int) \
-            else (c.min[1] if bottom and not opposite or opposite and not bottom else c.max[1])
+        p = (
+            c
+            if isinstance(c, (float, int))
+            else c.min[1]
+            if bottom and not opposite or opposite and not bottom
+            else c.max[1]
+        )
+
         self.translate(dy=p - y)
         return self
 
     def flip_boxes_y(self, gap: float):
         if gap >= self.size[0] / 2:
-            raise ValueError(f"Failed gap < size[0] / 2")
+            raise ValueError("Failed gap < size[0] / 2")
         box = Box(size=(self.size[0], self.size[1] / 2 - gap), spacing=self.spacing, min=self.min)
         return [box.copy, box.copy.flip_y().valign(self, bottom=False)]
 
     def flip_boxes_x(self, gap: float):
         if gap >= self.size[0] / 2:
-            raise ValueError(f"Failed gap < size[0] / 2")
+            raise ValueError("Failed gap < size[0] / 2")
         box = Box(size=(self.size[0] / 2 - gap, self.size[1]), spacing=self.spacing, min=self.min)
         return [box.copy, box.copy.flip_x().halign(self, left=False)]
 
     def flip_boxes_xy(self, gaps: Tuple[float, float] = (0, 0)):
         if gaps[0] >= self.size[0] / 2 or gaps[1] >= self.size[1] / 2:
-            raise ValueError(f"Failed gap < size[0] / 2 and gap < size[1] / 2")
+            raise ValueError("Failed gap < size[0] / 2 and gap < size[1] / 2")
         box = Box(size=(self.size[0] / 2 - gaps[0], self.size[1] / 2 - gaps[1]), spacing=self.spacing, min=self.min)
         return [box.copy, box.copy.flip_x().halign(self, left=False),
                 box.copy.flip_y().halign(self).valign(self, bottom=False),
@@ -175,8 +187,7 @@ def yee_avg(params: np.ndarray, shift: int = 1) -> np.ndarray:
 def yee_avg_2d_z(params: jnp.ndarray) -> jnp.ndarray:
     p = params[..., jnp.newaxis]
     p_y = (p + jnp.roll(p, shift=1, axis=0)) / 2
-    p_z = (p_y + jnp.roll(p_y, shift=1, axis=1)) / 2
-    return p_z
+    return (p_y + jnp.roll(p_y, shift=1, axis=1)) / 2
 
 
 def yee_avg_2d_xy(params: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:

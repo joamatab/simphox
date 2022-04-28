@@ -96,7 +96,7 @@ def test_spacing(shape: Shape, spacing: Dim,
     ],
 )
 def test_error_raised_for_shape_eps_mismatch(shape: Shape, eps: Union[float, np.ndarray]):
-    with pytest.raises(AttributeError, match=f'Require grid.shape == eps.shape but got'):
+    with pytest.raises(AttributeError, match='Require grid.shape == eps.shape but got'):
         Grid(shape, 1, eps)
 
 
